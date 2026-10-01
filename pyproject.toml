@@ -1,0 +1,27 @@
+[project]
+name = "cs-433-project-1"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Jonas Huber",email = "jonas.huber@epfl.ch"},
+    {name = "Niklas Waibel",email = "niklas.waibel@epfl.ch"},
+    {name = "Ghalia Bennani",email = "g.bennani@epfl.ch"}
+]
+
+requires-python = "^3.14"
+dependencies = [
+    "numpy (>=2.5.0,<3.0.0)",
+    "matplotlib (>=3.10.0,<4.0.0)"
+]
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=7.0"
+gitpython = ">=3.1"
+poethepoet = ">=0.24"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
