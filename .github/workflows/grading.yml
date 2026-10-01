@@ -1,0 +1,32 @@
+name: Grading Tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with test
+
+      - name: Configure git credentials
+        run: |
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Run grading tests
+        run: |
+          poetry run pytest --github_link https://github.com/${{ github.repository }}/tree/${{ github.sha }} grading_tests/
