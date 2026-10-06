@@ -89,6 +89,8 @@ def main():
     # 5. Run model on test data and produce submission txt
     #
     y_pred = Model.predict_logistic(w, tx_test, best_threshold)
+    # Switch the labels from {0, 1} to {-1, 1} as required by the submission
+    y_pred = np.where(y_pred == 1, 1, -1)
     create_csv_submission(test_ids, y_pred, "submission.csv")
     print("submission.csv created !")
 
@@ -102,9 +104,8 @@ def main():
     decision_age = (np.log(best_threshold / (1 - best_threshold)) - w[0]) / w[1] * 80
 
     ages = tx_train[:, 1] * 80
-    labels_01 = (y_train + 1) / 2  # map {-1, 1} -> {0, 1} for plotting
-    plt.scatter(ages[y_train == -1], labels_01[y_train == -1], alpha=0.05, s=5, color="steelblue", label="No disease")
-    plt.scatter(ages[y_train ==  1], labels_01[y_train ==  1], alpha=0.05, s=5, color="salmon",    label="Disease")
+    plt.scatter(ages[y_train == 0], y_train[y_train == 0], alpha=0.05, s=5, color="steelblue", label="No disease")
+    plt.scatter(ages[y_train == 1], y_train[y_train == 1], alpha=0.05, s=5, color="salmon",    label="Disease")
     plt.plot(age_range, prob_curve, color="black", linewidth=2, label="P(disease | age)")
     plt.axvline(decision_age, color="red", linestyle="--", label=f"Decision boundary (age={decision_age:.1f})")
     plt.ylim(-0.1, 1.1)

@@ -25,13 +25,14 @@ def sigmoid(z):
 
 def logistic_gradient(tx, y, w):
     N = tx.shape[0]
-    g = tx @ w
-    return -1 / N * tx.T @ (y * sigmoid(-y * g))
+    return 1 / N * tx.T @ (sigmoid(tx @ w) - y)
 
 
 def logistic_loss(tx, y, w):
+    N = tx.shape[0]
     g = tx @ w
-    return np.mean(np.log(1 + np.exp(-y * g)))
+    loss = -y * g - np.log(sigmoid(-g))
+    return np.mean(loss)
 
 
 def least_squares(y, tx):

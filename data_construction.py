@@ -38,6 +38,9 @@ def load_csv_data_cached():
     tx_train = np.hstack([np.ones((x_train.shape[0], 1)), x_train])
     tx_test  = np.hstack([np.ones((x_test.shape[0], 1)), x_test])
 
+    # Switch the labels from {-1, 1} to {0, 1}
+    y_train = np.where(y_train == 1, 1, 0)
+
     return tx_train, tx_test, y_train, test_ids
 
 

@@ -5,14 +5,14 @@ from implementations import sigmoid
 
 def predict_logistic(w, tx, threshold):
     y_prop = sigmoid(tx @ w)
-    return np.sign(y_prop - threshold).astype(int)
+    return (y_prop >= threshold).astype(int)
 
 
 def confusion_matrix(y_prediction, y_true):
-    tp = np.sum((y_prediction ==  1) & (y_true ==  1))
-    fp = np.sum((y_prediction ==  1) & (y_true == -1))
-    fn = np.sum((y_prediction == -1) & (y_true ==  1))
-    tn = np.sum((y_prediction == -1) & (y_true == -1))
+    tp = np.sum((y_prediction == 1) & (y_true == 1))
+    fp = np.sum((y_prediction == 1) & (y_true == 0))
+    fn = np.sum((y_prediction == 0) & (y_true == 1))
+    tn = np.sum((y_prediction == 0) & (y_true == 0))
     return tp, fp, fn, tn
 
 
