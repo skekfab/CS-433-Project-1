@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def MSE(tx, y, w):
@@ -49,18 +48,18 @@ def ridge_regression(y, tx, lambda_):
     return w, MSE(tx, y, w)
 
 
-def mean_squared_error_gd(y, tx, initial_w, matx_iters, gamma):
+def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
     """Linear regression via gradient descent on MSE."""
     w = initial_w
-    for i in range(matx_iters):
+    for i in range(max_iters):
         w = w - gamma * MSE_gradient(tx, y, w)
     return w, MSE(tx, y, w)
 
 
-def mean_squared_error_sgd(y, tx, initial_w, matx_iters, gamma):
+def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
     """Linear regression via stochastic gradient descent on MSE."""
     w = initial_w
-    for i in range(matx_iters):
+    for i in range(max_iters):
         w = w - gamma * MSE_stochastic_gradient(tx, y, w)
     return w, MSE(tx, y, w)
 
