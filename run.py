@@ -1,67 +1,118 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from helpers import create_csv_submission
+
+from helpers import create_csv_submission, build_k_indices
 import implementations as impl
-import Data_construction as Data
+import data_construction as Data
+import model as Model
+
 
 def main():
-  
-    tx_train, tx_test, y_train, test_ids = Data.load_cached()
-
-    for i in range(tx_train.shape[1]):
-        print("NaN total :", np.isnan(tx_train[i]).sum())
-
-    N = len(y_train)
-    indices = np.random.permutation(N)
-    split = int(N * 0.8)
-
-    X_train , Y_train = tx_train[indices[:split]] , y_train[indices[:split]]
-    X_val , Y_val = tx_train[indices[split:]] , y_train[indices[split:]]
-    
-    N , D = tx_train.shape
-    gamma , lambda_ = 0.01, 0.01
-
-    w_init = np.zeros(D)
-    w = w_init
-    loss_train , loss_val = [], []
-    
-    for i in range(1000):
-        loss_train.append(impl.reg_logistic_regression_stochastic(Y_train, X_train, lambda_, w, 1 , gamma)[1])
-        loss_val.append(impl.reg_logistic_regression_stochastic(Y_val, X_val, lambda_, w, 0 , gamma)[1])
-        ##print("loss_val[i] =", loss_train[i])
-        w = impl.reg_logistic_regression_stochastic(Y_train, X_train, lambda_, w, 1 , gamma)[0]
-
-    fig, axes = plt.subplots(figsize = (12,5))
-    axes.plot(range(len(loss_train)), loss_train, label='Training Loss')
-    axes.plot(range(len(loss_val)), loss_val, label='Validation Loss')
-    axes.set_xlabel(r'$t$')
-    axes.set_ylabel(r'$\mathcal{L}$')
-    axes.grid(True, alpha=0.3)
-    plt.show()
+    #
+    # 1. Load and prepare data
+    #
+    tx_train, tx_test, y_train, test_ids = Data.prepare_data(*Data.load_csv_data_cached())
 
 
+    #
+    # 2. Train with cross validation
+    #
+    # TODO currentlyy not used as their is now hyperparameter
+    SEED = 42
+    K_FOLD = 2
+    MAX_ITERS = 1000
+    STEP_SIZE = 0.4
+    INITIAL_W = np.array([-5.0, 4.0])
 
+    # k_indices = build_k_indices(y_train, K_FOLD, SEED)
+    #
+    # for k in range(0, K_FOLD):
+    #     #
+    #     # Perform one whole training
+    #     #
+    #     tr_indices = k_indices[k]
+    #     val_indices = np.concatenate([k_indices[j] for j in range(len(k_indices)) if j != k])
+    #
+    #     # Split training data into tr and val
+    #     tx_tr = tx_train[tr_indices]
+    #     y_tr = y_train[tr_indices]
+    #     tx_val = tx_train[val_indices]
+    #     y_val = tx_train[val_indices]
+    #
+    #     # Fit model
+    #     w, logistic_loss = impl.logistic_regression(y_tr, tx_tr, INITIAL_W, MAX_ITERS, STEP_SIZE)
 
+    #
+    # 3. Select best hyperparameter based on loss and retrain model on whole train dataset
+    #
+    # TODO for now we do not have a hyperparameter -> just retrain
+    w, log_loss = impl.logistic_regression(y_train, tx_train, INITIAL_W, MAX_ITERS, STEP_SIZE)
 
+    #
+    # 4. Find decision threshold
+    #
+    precs = []
+    recs = []
+    f1s = []
+    accs = []
 
+    THRESHOLDS = np.linspace(0, 1, 100)
 
+    for threshold_index, threshold in enumerate(THRESHOLDS):
 
+        # Use decision function with threshold to get predictions
+        y_tr_pred = Model.predict_logistic(w, tx_train, threshold)
 
+        # Calculate confusion matrix
+        tp, fp, fn, tn = Model.confusion_matrix(y_tr_pred, y_train)
 
+        # Calculate precision, recall, f1-score, and recall
+        acc, f1, prec, rec = Model.evaluate_model(fn, fp, tn, tp)
 
+        # Append precision, recall, f1-score, and recall to overall list
+        precs.append(prec)
+        recs.append(rec)
+        f1s.append(f1)
+        accs.append(acc)
 
+    # Find best threshold
+    best_threshold_index = np.argmax(f1s)
+    best_threshold = THRESHOLDS[best_threshold_index]
+    print(f"Best threshold: {best_threshold:.2f}")
+    print("Results:")
+    print(f"  Precision {precs[best_threshold_index]:.2f}")
+    print(f"  Recall {precs[best_threshold_index]:.2f}")
+    print(f"  F1-Score {precs[best_threshold_index]:.2f}")
+    print(f"  Accuracy {precs[best_threshold_index]:.2f}")
 
-    print("tx_train.shape =", tx_train.shape)
-    print("tx_train.shape")
-    lambda_ = 0.1
-    w, loss = impl.ridge_regression(y_train, tx_train, lambda_)
-    print(f"Loss: {loss}")
-
-    y_pred_raw = tx_test @ w
-    y_pred = np.where(y_pred_raw > 0, 1, -1)
-
+    #
+    # 5. Run model on test data and produce submission txt
+    #
+    y_pred = Model.predict_logistic(w, tx_test, best_threshold)
     create_csv_submission(test_ids, y_pred, "submission.csv")
     print("submission.csv created !")
+
+
+    #
+    # 6. Create plot with decision boundary
+    #
+    age_range = np.arange(0, 81)
+    prob_curve = impl.sigmoid(w[0] + w[1] * (age_range / 80))
+
+    decision_age = (np.log(best_threshold / (1 - best_threshold)) - w[0]) / w[1] * 80
+
+    ages = tx_train[:, 1] * 80
+    labels_01 = (y_train + 1) / 2  # map {-1, 1} -> {0, 1} for plotting
+    plt.scatter(ages[y_train == -1], labels_01[y_train == -1], alpha=0.05, s=5, color="steelblue", label="No disease")
+    plt.scatter(ages[y_train ==  1], labels_01[y_train ==  1], alpha=0.05, s=5, color="salmon",    label="Disease")
+    plt.plot(age_range, prob_curve, color="black", linewidth=2, label="P(disease | age)")
+    plt.axvline(decision_age, color="red", linestyle="--", label=f"Decision boundary (age={decision_age:.1f})")
+    plt.ylim(-0.1, 1.1)
+    plt.xlabel("Age")
+    plt.ylabel("P(heart disease = 1)")
+    plt.legend()
+    plt.savefig("decision_boundary.png", dpi=150)
+    plt.show()
 
 if __name__ == "__main__":
     main()

@@ -25,14 +25,13 @@ def sigmoid(z):
 
 def logistic_gradient(tx, y, w):
     N = tx.shape[0]
-    return 1 / N * tx.T @ (sigmoid(tx @ w) - y)
+    g = tx @ w
+    return -1 / N * tx.T @ (y * sigmoid(-y * g))
 
 
 def logistic_loss(tx, y, w):
-    N = tx.shape[0]
     g = tx @ w
-    loss = -y * g - np.log(sigmoid(-g))
-    return np.mean(loss)
+    return np.mean(np.log(1 + np.exp(-y * g)))
 
 
 def least_squares(y, tx):
@@ -64,24 +63,25 @@ def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
     return w, MSE(tx, y, w)
 
 
-def logistic_regression(y, tx, initial_w, matx_iters, gamma):
+def logistic_regression(y, tx, initial_w, max_iters, gamma):
     """Logistic regression via gradient descent."""
     w = initial_w
-    for i in range(matx_iters):
+    for i in range(max_iters):
+        if i%100 == 0: print(f"Iteration {i}; Weights {w}; Loss {logistic_loss(tx, y, w)}")
         w = w - gamma * logistic_gradient(tx, y, w)
     return w, logistic_loss(tx, y, w)
 
 
-def reg_logistic_regression(y, tx, lambda_, initial_w, matx_iters, gamma):
+def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     """Regularized logistic regression, returned loss etxcludes penalty."""
     w = initial_w
-    for i in range(matx_iters):
+    for i in range(max_iters):
         w = w - gamma * (logistic_gradient(tx, y, w) + 2 * lambda_ * w)
     return w, logistic_loss(tx, y, w)
 
-def reg_logistic_regression_stochastic(y, tx, lambda_, initial_w, matx_iters, gamma):
+def reg_logistic_regression_stochastic(y, tx, lambda_, initial_w, max_iters, gamma):
     w = initial_w
-    for i in range(matx_iters):
+    for i in range(max_iters):
         N = tx.shape[0]
         idx = np.random.randint(N)
         w = w - gamma * (logistic_gradient(tx[idx:idx+1], y[idx:idx+1], w) + 2 * lambda_ * w)

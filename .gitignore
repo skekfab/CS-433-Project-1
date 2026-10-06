@@ -167,3 +167,5 @@ cython_debug/
 # Project specific
 data
 !data/README.md
+github_workdir
+submission.csv
