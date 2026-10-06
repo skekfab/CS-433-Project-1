@@ -32,4 +32,4 @@ jobs:
 
       - name: Run grading tests
         run: |
-          poetry run pytest --github_link https://github.com/${{ github.repository }}/tree/${{ github.sha }} grading_tests/
+          poetry run pytest --github_link https://github.com/${{ github.repository }}/tree/${{ github.event.pull_request.head.sha || github.sha }} grading_tests/
