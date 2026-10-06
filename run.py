@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from helpers import load_csv_data, create_csv_submission
+from helpers import create_csv_submission
 import implementations as impl
-import os
 import Data_construction as Data
 
 def main():
@@ -10,7 +9,7 @@ def main():
     tx_train, tx_test, y_train, test_ids = Data.load_cached()
 
     for i in range(tx_train.shape[1]):
-        print("NaN totaux :", np.isnan(tx_train[i]).sum())
+        print("NaN total :", np.isnan(tx_train[i]).sum())
 
     N = len(y_train)
     indices = np.random.permutation(N)
@@ -62,7 +61,7 @@ def main():
     y_pred = np.where(y_pred_raw > 0, 1, -1)
 
     create_csv_submission(test_ids, y_pred, "submission.csv")
-    print("submission.csv créé !")
+    print("submission.csv created !")
 
 if __name__ == "__main__":
     main()
