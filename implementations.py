@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def MSE(tx, y, w):
     N = tx.shape[0]
     e = y - tx @ w
@@ -17,6 +16,12 @@ def MSE_stochastic_gradient(tx, y, w):
     N = tx.shape[0]
     i = np.random.randint(N)
     return MSE_gradient(tx[i : i + 1], y[i : i + 1], w)
+
+
+def logistic_minibatch_gradient(tx, y, w, batch_size):
+    N = tx.shape[0]
+    idx = np.random.choice(N, size=batch_size, replace=False)
+    return logistic_gradient(tx[idx], y[idx], w)
 
 
 def sigmoid(z):
@@ -76,14 +81,15 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     """Regularized logistic regression, returned loss etxcludes penalty."""
     w = initial_w
     for i in range(max_iters):
-        if i%100 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
+        if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
         w = w - gamma * (logistic_gradient(tx, y, w) + 2 * lambda_ * w)
     return w, logistic_loss(tx, y, w)
 
-def reg_logistic_regression_stochastic(y, tx, lambda_, initial_w, max_iters, gamma):
+def reg_logistic_regression_stochastic(y, tx, lambda_, initial_w, max_iters, gamma, batch_size):
     w = initial_w
     for i in range(max_iters):
-        N = tx.shape[0]
-        idx = np.random.randint(N)
-        w = w - gamma * (logistic_gradient(tx[idx:idx+1], y[idx:idx+1], w) + 2 * lambda_ * w)
+        if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
+        idx = np.random.randint(tx.shape[0])
+        w = w - gamma * (logistic_minibatch_gradient(tx, y, w, batch_size) + 2 * lambda_ * w)
     return w, logistic_loss(tx, y, w)
+

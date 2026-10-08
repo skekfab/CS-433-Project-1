@@ -114,3 +114,12 @@ def load_csv_data_cached():
     y_train = np.where(y_train == 1, 1, 0)
 
     return tx_train, tx_test, y_train, test_ids
+
+def data_cross_validationed(tx_train, y_train, k_indices, k):
+    tr_indices = np.concatenate([k_indices[j] for j in range(len(k_indices)) if j != k])
+    val_indices =  k_indices[k]
+    tx_tr = tx_train[tr_indices]
+    y_tr = y_train[tr_indices]
+    tx_val = tx_train[val_indices]
+    y_val = y_train[val_indices]
+    return tx_tr, y_tr, tx_val, y_val
