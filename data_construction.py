@@ -17,6 +17,7 @@ def prepare_data_only_age(tx_train, tx_test, y_train, test_ids):
 
     return tx_train, tx_test, y_train, test_ids
 
+
 def prepare_data_all_non_null_features(tx_train, tx_test, y_train, test_ids):
     #
     # 0. Helper functions
@@ -33,38 +34,13 @@ def prepare_data_all_non_null_features(tx_train, tx_test, y_train, test_ids):
     #
     # 1. Drop columns with no predictive power
     #
-
-    # Interview timing — date/month/year/day of the phone call, not respondent health
     TIMING = ["FMONTH", "IDATE", "IMONTH", "IDAY", "IYEAR"]
-
-    # Survey administration — completion status, sequence number, sampling unit
     ADMIN = ["DISPCODE", "SEQNO", "_PSU"]
-
-    # Landline-only call-routing questions — blank for all ~42% cell-phone
-    # respondents by design; encode survey logistics, not health status
-    LANDLINE_ROUTING = [
-        "CTELENUM", "PVTRESD1", "COLGHOUS", "STATERES", "CELLFON3", "LADULT",
-        "NUMADULT", "NUMMEN", "NUMWOMEN",
-    ]
-
-    # Cell-phone-only call-routing questions — blank for all ~58% landline
-    # respondents by design; encode survey logistics, not health status
-    CELLPHONE_ROUTING = [
-        "CTELNUM1", "CELLFON2", "CADULT", "PVTRESD2", "CCLGHOUS",
-        "CSTATE", "LANDLINE", "HHADULT",
-    ]
-
-    # Post-stratification survey weights — encode sampling probability for
-    # national representativeness, not any characteristic of the respondent
-    WEIGHTS = [
-        "_STSTR", "_STRWT", "_RAWRAKE", "_WT2RAKE",
-        "_CLLCPWT", "_DUALUSE", "_DUALCOR", "_LLCPWT",
-    ]
-
-    # Questionnaire metadata — version and language of the survey instrument;
-    # reflect survey logistics rather than respondent health
+    LANDLINE_ROUTING = ["CTELENUM", "PVTRESD1", "COLGHOUS", "STATERES", "CELLFON3", "LADULT", "NUMADULT", "NUMMEN",
+                        "NUMWOMEN"]
+    CELLPHONE_ROUTING = ["CTELNUM1", "CELLFON2", "CADULT", "PVTRESD2", "CCLGHOUS", "CSTATE", "LANDLINE", "HHADULT"]
+    WEIGHTS = ["_STSTR", "_STRWT", "_RAWRAKE", "_WT2RAKE", "_CLLCPWT", "_DUALUSE", "_DUALCOR", "_LLCPWT"]
     QUESTIONNAIRE_META = ["QSTVER", "QSTLANG"]
-
     DROP = TIMING + ADMIN + LANDLINE_ROUTING + CELLPHONE_ROUTING + WEIGHTS + QUESTIONNAIRE_META
 
     keep = np.ones(tx_train.shape[1], dtype=bool)
@@ -84,6 +60,45 @@ def prepare_data_all_non_null_features(tx_train, tx_test, y_train, test_ids):
 
     means = tx_train[:, 1:].mean(axis=0)
     stds = tx_train[:, 1:].std(axis=0)
+    tx_train[:, 1:] = (tx_train[:, 1:] - means) / stds
+    tx_test[:, 1:]  = (tx_test[:, 1:]  - means) / stds
+
+    return tx_train, tx_test, y_train, test_ids
+
+
+def prepare_data_median_imputed(tx_train, tx_test, y_train, test_ids):
+    with open(os.path.join(DATA_DIR, "x_train.csv"), "r") as f:
+        feature_names = f.readline().strip().split(",")[1:]
+
+    def indices(names):
+        return [feature_names.index(n) + 1 for n in names if n in feature_names]
+
+    TIMING = ["FMONTH", "IDATE", "IMONTH", "IDAY", "IYEAR"]
+    ADMIN = ["DISPCODE", "SEQNO", "_PSU"]
+    LANDLINE_ROUTING = ["CTELENUM", "PVTRESD1", "COLGHOUS", "STATERES", "CELLFON3", "LADULT", "NUMADULT", "NUMMEN", "NUMWOMEN"]
+    CELLPHONE_ROUTING = ["CTELNUM1", "CELLFON2", "CADULT", "PVTRESD2", "CCLGHOUS", "CSTATE", "LANDLINE", "HHADULT"]
+    WEIGHTS = ["_STSTR", "_STRWT", "_RAWRAKE", "_WT2RAKE", "_CLLCPWT", "_DUALUSE", "_DUALCOR", "_LLCPWT"]
+    QUESTIONNAIRE_META = ["QSTVER", "QSTLANG"]
+    DROP = TIMING + ADMIN + LANDLINE_ROUTING + CELLPHONE_ROUTING + WEIGHTS + QUESTIONNAIRE_META
+
+    keep = np.ones(tx_train.shape[1], dtype=bool)
+    for idx in indices(DROP):
+        keep[idx] = False
+    tx_train = tx_train[:, keep]
+    tx_test  = tx_test[:, keep]
+
+    all_null = np.all(np.isnan(tx_train[:, 1:]), axis=0)
+    col_indices = np.concatenate([[0], np.where(~all_null)[0] + 1])
+    tx_train = tx_train[:, col_indices]
+    tx_test  = tx_test[:, col_indices]
+
+    medians = np.nanmedian(tx_train[:, 1:], axis=0)
+    tx_train[:, 1:] = np.where(np.isnan(tx_train[:, 1:]), medians, tx_train[:, 1:])
+    tx_test[:, 1:]  = np.where(np.isnan(tx_test[:, 1:]),  medians, tx_test[:, 1:])
+
+    means = tx_train[:, 1:].mean(axis=0)
+    stds  = tx_train[:, 1:].std(axis=0)
+    stds[stds == 0] = 1
     tx_train[:, 1:] = (tx_train[:, 1:] - means) / stds
     tx_test[:, 1:]  = (tx_test[:, 1:]  - means) / stds
 
@@ -115,7 +130,8 @@ def load_csv_data_cached():
 
     return tx_train, tx_test, y_train, test_ids
 
-def data_cross_validationed(tx_train, y_train, k_indices, k):
+
+def data_cross_validated(tx_train, y_train, k_indices, k):
     tr_indices = np.concatenate([k_indices[j] for j in range(len(k_indices)) if j != k])
     val_indices =  k_indices[k]
     tx_tr = tx_train[tr_indices]
