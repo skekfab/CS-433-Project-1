@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 def MSE(tx, y, w):
     N = tx.shape[0]
@@ -72,7 +73,7 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
     """Logistic regression via gradient descent."""
     w = initial_w
     for i in range(max_iters):
-        if i%100 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
+        ##if i%100 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
         w = w - gamma * logistic_gradient(tx, y, w)
     return w, logistic_loss(tx, y, w)
 
@@ -81,15 +82,14 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     """Regularized logistic regression, returned loss etxcludes penalty."""
     w = initial_w
     for i in range(max_iters):
-        if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
+        ##if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
         w = w - gamma * (logistic_gradient(tx, y, w) + 2 * lambda_ * w)
     return w, logistic_loss(tx, y, w)
 
 def reg_logistic_regression_stochastic(y, tx, lambda_, initial_w, max_iters, gamma, batch_size):
     w = initial_w
     for i in range(max_iters):
-        if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
+        ##if i%1000 == 0: print(f"Iteration {i}; Loss {logistic_loss(tx, y, w)}")
         idx = np.random.randint(tx.shape[0])
         w = w - gamma * (logistic_minibatch_gradient(tx, y, w, batch_size) + 2 * lambda_ * w)
     return w, logistic_loss(tx, y, w)
-
