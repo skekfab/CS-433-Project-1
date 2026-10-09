@@ -12,8 +12,8 @@ def prepare_data_only_age(tx_train, tx_test, y_train, test_ids):
     tx_test  = tx_test[:, [0, 249]]
 
     # Normalize age
-    tx_train[:, 1] = tx_train[:, 1] / 80
-    tx_test[:, 1]  = tx_test[:, 1] / 80
+    tx_train[:, 1] = (tx_train[:, 1] - 18) / 62
+    tx_test[:, 1]  = (tx_test[:, 1] - 18) / 62
 
     return tx_train, tx_test, y_train, test_ids
 
