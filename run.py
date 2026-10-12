@@ -45,19 +45,20 @@ def main():
     k_indices = build_k_indices(y_train, 5, SEED)
     tx_tr , y_tr , tx_val , y_val = Data.data_cross_validated(tx_train, y_train, k_indices, 0)
     w, _ = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, best_lambda, INITIAL_W, MAX_ITERS, GAMMA, MINIBATCH)
-    x = Model.best_threshold(tx_val, y_val, w)
-    print(f"Best threshold: {x[0]:.2f}")
+    best_threshold, precision, recall, f1_score, accuracy = Model.best_threshold(tx_val, y_val, w)
+    
+    print(f"Best threshold: {best_threshold:.2f}")
     print("Results:")
-    print(f"  Precision {x[1]:.2f}")
-    print(f"  Recall {x[2]:.2f}")
-    print(f"  F1-Score {x[3]:.2f}")
-    print(f"  Accuracy {x[4]:.2f}")
+    print(f"  Precision {precision:.4f}")
+    print(f"  Recall {recall:.4f}")
+    print(f"  F1-Score {f1_score:.4f}")
+    print(f"  Accuracy {accuracy:.4f}")
 
     ########################################################################################################################################
     # 4. Run model on test data and produce submission txt
     ########################################################################################################################################
 
-    y_pred = Model.predict_logistic(w, tx_test, x[0])
+    y_pred = Model.predict_logistic(w, tx_test, best_threshold)
     y_pred = np.where(y_pred == 1, 1, -1)
     create_csv_submission(test_ids, y_pred, "submission.csv")
     print("submission.csv created !")
@@ -108,15 +109,15 @@ def main():
     # 5. Plot training and validation loss over iterations for both regularized (lambda = 0.2) and non-regularized logistic regression 
     ########################################################################################################################################
 
-    k_indices = build_k_indices(y_train, 5, SEED) ; MINIBATCH = 100 ; INITIAL_W = np.zeros(tx_train.shape[1]) 
+    k_indices = build_k_indices(y_train, 5, SEED) ; MINIBATCH = 100 ; INITIAL_W = np.zeros(tx_train.shape[1])
     tx_tr , y_tr , tx_val , y_val = Data.data_cross_validated(tx_train, y_train, k_indices, 0)
     tx_train_subset, y_train_subset , tx_tr , y_tr= tx_tr[:2000] , y_tr[:2000] , tx_tr[:10000] , y_tr[:10000]
 
-    train_losses , val_losses , train_losses_reg , val_losses_reg , train_losses_all , val_losses_all , train_losses_all_reg , val_losses_all_reg = [] , [] , [] , [] , [] , [] , [] , [] 
+    train_losses , val_losses , train_losses_reg , val_losses_reg , train_losses_all , val_losses_all , train_losses_all_reg , val_losses_all_reg = [] , [] , [] , [] , [] , [] , [] , []
     w , w_reg , w_all , w_all_reg = INITIAL_W , INITIAL_W , INITIAL_W , INITIAL_W
 
     for i in range(MAX_ITERS):
-        
+
         ## Train model on 10k data and comparing train loss and validation loss with and without regularization
 
         w_all , loss_tr_all = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, 0, w_all, 1, GAMMA, MINIBATCH)
@@ -131,10 +132,10 @@ def main():
         w , loss_tr = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0, w, 1, GAMMA, MINIBATCH)
         w_reg , loss_tr_reg = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0.2, w_reg, 1, GAMMA, MINIBATCH)
 
-        loss_val = impl.logistic_loss(tx_val, y_val, w) ; loss_val_reg = impl.logistic_loss(tx_val, y_val, w_reg) 
+        loss_val = impl.logistic_loss(tx_val, y_val, w) ; loss_val_reg = impl.logistic_loss(tx_val, y_val, w_reg)
         train_losses.append(loss_tr) ; train_losses_reg.append(loss_tr_reg)
-        val_losses.append(loss_val) ; val_losses_reg.append(loss_val_reg) 
-   
+        val_losses.append(loss_val) ; val_losses_reg.append(loss_val_reg)
+
         if i % 1000 == 0:
             print(f"Iteration {i}")
 
