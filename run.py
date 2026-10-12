@@ -11,16 +11,17 @@ def main():
     # 1. Finding the best hyperparameter lambda for regularized logistic regression using cross-validation and stochastic gradient descent
     ########################################################################################################################################
 
-    tx_train, tx_test, y_train, test_ids = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
+    ##tx_train, tx_test, y_train, test_ids = Data.prepare_data_only_age(*Data.load_csv_data_cached())
+    ##tx_train, tx_test, y_train, test_ids = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
     tx_train, tx_test, y_train, test_ids = Data.prepare_data_median_imputed(*Data.load_csv_data_cached())
+
     SEED = 42
     K_FOLD = 3
-    MAX_ITERS = 5000
+    MAX_ITERS = 3000
     GAMMA = 0.05
     INITIAL_W = np.zeros(tx_train.shape[1])
-    ##INITIAL_W = np.random.uniform(-1, 1, tx_train.shape[1])
-    MINIBATCH = 20
-    LAMBDAS = [0, 0.01, 0.02]
+    MINIBATCH = 100
+    LAMBDAS = [0, 1e-3, 1e-2, 0.1, 0.2, 0.5]
     k_indices = build_k_indices(y_train, K_FOLD, SEED)
 
     loss_averages = []
@@ -33,26 +34,18 @@ def main():
             losses.append(log_loss_val)
         loss_averages.append(np.mean(losses))
 
-    ########################################################################################################################################
-    # 2. Select best hyperparameter based on loss and retrain model on whole train dataset and plot training and validation loss over iterations
-    ########################################################################################################################################
-
     best_lambda_index = np.argmin(loss_averages)
-
-    print("=== LOSS AVERAGES ===")
-    for lam, loss in zip(LAMBDAS, loss_averages):
-        print(f"  lambda = {lam:.4f}  →  loss = {loss:.6f}")
-    print(f"best_lambda_index = {np.argmin(loss_averages)}")
-
     best_lambda = LAMBDAS[best_lambda_index]
     print(f"Best lambda: {best_lambda}")
-    w, _ = impl.reg_logistic_regression_stochastic(y_train, tx_train, best_lambda, INITIAL_W, MAX_ITERS, GAMMA, MINIBATCH)
 
     ########################################################################################################################################
-    # 3. Find decision threshold and evaluate model
+    # 3. Select best lambda and use it to find decision threshold and evaluate model with best lambda 
     ########################################################################################################################################
 
-    x = Model.best_threshold(tx_train, y_train, w) ## function returns best threshold and associed precision, recall, f1-score, accuracy
+    k_indices = build_k_indices(y_train, 5, SEED)
+    tx_tr , y_tr , tx_val , y_val = Data.data_cross_validated(tx_train, y_train, k_indices, 0)
+    w, _ = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, best_lambda, INITIAL_W, MAX_ITERS, GAMMA, MINIBATCH)
+    x = Model.best_threshold(tx_val, y_val, w)
     print(f"Best threshold: {x[0]:.2f}")
     print("Results:")
     print(f"  Precision {x[1]:.2f}")
@@ -70,7 +63,49 @@ def main():
     print("submission.csv created !")
 
     ########################################################################################################################################
-    # 5. Plot training and validation loss over iterations for both regularized and non-regularized logistic regression 
+    # 3. Comparaison of the loss validation for non null features vs median imputed features with best lambda 
+    ########################################################################################################################################
+
+    tx_train_nn, _, y_train_nn, _ = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
+    tx_train_med, _, y_train_med, _ = Data.prepare_data_median_imputed(*Data.load_csv_data_cached())
+
+    k_indices_nn , k_indices_med = build_k_indices(y_train_nn, 5, SEED) , build_k_indices(y_train_med, 5, SEED) 
+
+    tx_train_nn, y_train_nn , tx_val_nn, y_val_nn = Data.data_cross_validated(tx_train_nn, y_train_nn, k_indices_nn, 0)
+    tx_train_med, y_train_med , tx_val_med, y_val_med  = Data.data_cross_validated(tx_train_med, y_train_med, k_indices_med, 0)
+
+    MINIBATCH = 200 
+    w_nn , w_med = np.zeros(tx_train_nn.shape[1])  , np.zeros(tx_train_med.shape[1]) 
+    Loss_nn , Loss_med = [], []
+
+    for i in range(0, MAX_ITERS):
+        w_nn, _ = impl.reg_logistic_regression_stochastic(y_train_nn, tx_train_nn, best_lambda, w_nn, 1, GAMMA, MINIBATCH)
+        w_med, _ = impl.reg_logistic_regression_stochastic(y_train_med, tx_train_med, best_lambda, w_med, 1, GAMMA, MINIBATCH)
+
+        loss_val_nn = impl.logistic_loss(tx_val_nn, y_val_nn, w_nn) ; loss_val_med = impl.logistic_loss(tx_val_med, y_val_med, w_med)
+        Loss_nn.append(loss_val_nn) ; Loss_med.append(loss_val_med)
+
+    best_t_nn,  p_nn,  r_nn,  f1_nn,  z = Model.best_threshold(tx_val_nn,  y_val_nn,  w_nn)
+    best_t_med, p_med, r_med, f1_med, t = Model.best_threshold(tx_val_med, y_val_med, w_med)
+
+    print(f"Non-null : F1={f1_nn:.4f}, Acc={z:.4f}, R={r_nn:.4f}")
+    print(f"Median   : F1={f1_med:.4f}, Acc={t:.4f}, R={r_med:.4f}")
+
+    fig, axes_comp = plt.subplots(1, 1, figsize=(15, 5)) 
+
+    axes_comp.plot(range(200, MAX_ITERS), Loss_nn[200:],label="Non-null features")
+    axes_comp.plot(range(200, MAX_ITERS), Loss_med[200:],label="Median imputation")
+    axes_comp.set_title(f'Comparison loss validation for non null features vs median imputed features')
+    axes_comp.set_xlabel('Iteration')
+    axes_comp.set_ylabel('Log-loss')
+    axes_comp.legend()
+    axes_comp.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+    ########################################################################################################################################
+    # 5. Plot training and validation loss over iterations for both regularized (lambda = 0.2) and non-regularized logistic regression 
     ########################################################################################################################################
 
     k_indices = build_k_indices(y_train, 5, SEED) ; MINIBATCH = 100 ; INITIAL_W = np.zeros(tx_train.shape[1]) 

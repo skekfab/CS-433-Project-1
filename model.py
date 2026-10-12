@@ -41,7 +41,7 @@ def best_threshold(tx_train, y_train, w):
     
     precs , recs, f1s, accs = [], [], [], []
 
-    THRESHOLDS = np.linspace(0, 1, 100)
+    THRESHOLDS = np.linspace(0.01, 0.99, 99)
 
     for threshold_index, threshold in enumerate(THRESHOLDS):
 
