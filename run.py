@@ -182,4 +182,4 @@ def main(plot_non_null_vs_median: bool = False, plot_loss_regularization: bool =
 
 
 if __name__ == "__main__":
-    main(plot_non_null_vs_median=True)
+    main()
