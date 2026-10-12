@@ -5,7 +5,7 @@ import implementations as impl
 import data_construction as Data
 import model as Model
 
-def main():
+def main(plot_non_null_vs_median: bool = False, plot_loss_regularization: bool = False):
 
     ########################################################################################################################################
     # 1. Finding the best hyperparameter lambda for regularized logistic regression using cross-validation and stochastic gradient descent
@@ -14,6 +14,7 @@ def main():
     ##tx_train, tx_test, y_train, test_ids = Data.prepare_data_only_age(*Data.load_csv_data_cached())
     ##tx_train, tx_test, y_train, test_ids = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
     tx_train, tx_test, y_train, test_ids = Data.prepare_data_median_imputed(*Data.load_csv_data_cached())
+    print("Data loaded successfully, starting training")
 
     SEED = 42
     K_FOLD = 3
@@ -64,118 +65,121 @@ def main():
     print("submission.csv created !")
 
     ########################################################################################################################################
-    # 3. Comparaison of the loss validation for non null features vs median imputed features with best lambda 
+    # 5. Comparison of the loss validation for non null features vs median imputed features with best lambda
     ########################################################################################################################################
+    if plot_non_null_vs_median:
+        tx_train_nn, _, y_train_nn, _ = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
+        tx_train_med, _, y_train_med, _ = Data.prepare_data_median_imputed(*Data.load_csv_data_cached())
 
-    tx_train_nn, _, y_train_nn, _ = Data.prepare_data_all_non_null_features(*Data.load_csv_data_cached())
-    tx_train_med, _, y_train_med, _ = Data.prepare_data_median_imputed(*Data.load_csv_data_cached())
+        k_indices_nn , k_indices_med = build_k_indices(y_train_nn, 5, SEED) , build_k_indices(y_train_med, 5, SEED)
 
-    k_indices_nn , k_indices_med = build_k_indices(y_train_nn, 5, SEED) , build_k_indices(y_train_med, 5, SEED) 
+        tx_train_nn, y_train_nn , tx_val_nn, y_val_nn = Data.data_cross_validated(tx_train_nn, y_train_nn, k_indices_nn, 0)
+        tx_train_med, y_train_med , tx_val_med, y_val_med  = Data.data_cross_validated(tx_train_med, y_train_med, k_indices_med, 0)
 
-    tx_train_nn, y_train_nn , tx_val_nn, y_val_nn = Data.data_cross_validated(tx_train_nn, y_train_nn, k_indices_nn, 0)
-    tx_train_med, y_train_med , tx_val_med, y_val_med  = Data.data_cross_validated(tx_train_med, y_train_med, k_indices_med, 0)
+        MINIBATCH = 200
+        w_nn , w_med = np.zeros(tx_train_nn.shape[1])  , np.zeros(tx_train_med.shape[1])
+        Loss_nn , Loss_med = [], []
 
-    MINIBATCH = 200 
-    w_nn , w_med = np.zeros(tx_train_nn.shape[1])  , np.zeros(tx_train_med.shape[1]) 
-    Loss_nn , Loss_med = [], []
+        for i in range(0, MAX_ITERS):
+            w_nn, _ = impl.reg_logistic_regression_stochastic(y_train_nn, tx_train_nn, best_lambda, w_nn, 1, GAMMA, MINIBATCH)
+            w_med, _ = impl.reg_logistic_regression_stochastic(y_train_med, tx_train_med, best_lambda, w_med, 1, GAMMA, MINIBATCH)
 
-    for i in range(0, MAX_ITERS):
-        w_nn, _ = impl.reg_logistic_regression_stochastic(y_train_nn, tx_train_nn, best_lambda, w_nn, 1, GAMMA, MINIBATCH)
-        w_med, _ = impl.reg_logistic_regression_stochastic(y_train_med, tx_train_med, best_lambda, w_med, 1, GAMMA, MINIBATCH)
+            loss_val_nn = impl.logistic_loss(tx_val_nn, y_val_nn, w_nn) ; loss_val_med = impl.logistic_loss(tx_val_med, y_val_med, w_med)
+            Loss_nn.append(loss_val_nn) ; Loss_med.append(loss_val_med)
 
-        loss_val_nn = impl.logistic_loss(tx_val_nn, y_val_nn, w_nn) ; loss_val_med = impl.logistic_loss(tx_val_med, y_val_med, w_med)
-        Loss_nn.append(loss_val_nn) ; Loss_med.append(loss_val_med)
+        best_t_nn,  p_nn,  r_nn,  f1_nn,  z = Model.best_threshold(tx_val_nn,  y_val_nn,  w_nn)
+        best_t_med, p_med, r_med, f1_med, t = Model.best_threshold(tx_val_med, y_val_med, w_med)
 
-    best_t_nn,  p_nn,  r_nn,  f1_nn,  z = Model.best_threshold(tx_val_nn,  y_val_nn,  w_nn)
-    best_t_med, p_med, r_med, f1_med, t = Model.best_threshold(tx_val_med, y_val_med, w_med)
+        print(f"Non-null : F1={f1_nn:.4f}, Acc={z:.4f}, R={r_nn:.4f}")
+        print(f"Median   : F1={f1_med:.4f}, Acc={t:.4f}, R={r_med:.4f}")
 
-    print(f"Non-null : F1={f1_nn:.4f}, Acc={z:.4f}, R={r_nn:.4f}")
-    print(f"Median   : F1={f1_med:.4f}, Acc={t:.4f}, R={r_med:.4f}")
+        fig, axes_comp = plt.subplots(1, 1, figsize=(15, 5))
 
-    fig, axes_comp = plt.subplots(1, 1, figsize=(15, 5)) 
+        axes_comp.plot(range(200, MAX_ITERS), Loss_nn[200:],label="Non-null features")
+        axes_comp.plot(range(200, MAX_ITERS), Loss_med[200:],label="Median imputation")
+        axes_comp.set_title(f'Comparison loss validation for non null features vs median imputed features')
+        axes_comp.set_xlabel('Iteration')
+        axes_comp.set_ylabel('Log-loss')
+        axes_comp.legend()
+        axes_comp.grid(alpha=0.3)
 
-    axes_comp.plot(range(200, MAX_ITERS), Loss_nn[200:],label="Non-null features")
-    axes_comp.plot(range(200, MAX_ITERS), Loss_med[200:],label="Median imputation")
-    axes_comp.set_title(f'Comparison loss validation for non null features vs median imputed features')
-    axes_comp.set_xlabel('Iteration')
-    axes_comp.set_ylabel('Log-loss')
-    axes_comp.legend()
-    axes_comp.grid(alpha=0.3)
-
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
     ########################################################################################################################################
     # 5. Plot training and validation loss over iterations for both regularized (lambda = 0.2) and non-regularized logistic regression 
     ########################################################################################################################################
+    if plot_loss_regularization:
+        k_indices = build_k_indices(y_train, 5, SEED) ; MINIBATCH = 100 ; INITIAL_W = np.zeros(tx_train.shape[1])
+        tx_tr , y_tr , tx_val , y_val = Data.data_cross_validated(tx_train, y_train, k_indices, 0)
+        tx_train_subset, y_train_subset , tx_tr , y_tr= tx_tr[:2000] , y_tr[:2000] , tx_tr[:10000] , y_tr[:10000]
 
-    k_indices = build_k_indices(y_train, 5, SEED) ; MINIBATCH = 100 ; INITIAL_W = np.zeros(tx_train.shape[1])
-    tx_tr , y_tr , tx_val , y_val = Data.data_cross_validated(tx_train, y_train, k_indices, 0)
-    tx_train_subset, y_train_subset , tx_tr , y_tr= tx_tr[:2000] , y_tr[:2000] , tx_tr[:10000] , y_tr[:10000]
+        train_losses , val_losses , train_losses_reg , val_losses_reg , train_losses_all , val_losses_all , train_losses_all_reg , val_losses_all_reg = [] , [] , [] , [] , [] , [] , [] , []
+        w , w_reg , w_all , w_all_reg = INITIAL_W , INITIAL_W , INITIAL_W , INITIAL_W
 
-    train_losses , val_losses , train_losses_reg , val_losses_reg , train_losses_all , val_losses_all , train_losses_all_reg , val_losses_all_reg = [] , [] , [] , [] , [] , [] , [] , []
-    w , w_reg , w_all , w_all_reg = INITIAL_W , INITIAL_W , INITIAL_W , INITIAL_W
+        for i in range(MAX_ITERS):
 
-    for i in range(MAX_ITERS):
+            ## Train model on 10k data and comparing train loss and validation loss with and without regularization
 
-        ## Train model on 10k data and comparing train loss and validation loss with and without regularization
+            w_all , loss_tr_all = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, 0, w_all, 1, GAMMA, MINIBATCH)
+            w_all_reg , loss_tr_all_reg = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, 0.2, w_all_reg, 1, GAMMA, MINIBATCH)
 
-        w_all , loss_tr_all = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, 0, w_all, 1, GAMMA, MINIBATCH)
-        w_all_reg , loss_tr_all_reg = impl.reg_logistic_regression_stochastic(y_tr, tx_tr, 0.2, w_all_reg, 1, GAMMA, MINIBATCH)
+            loss_vall_all = impl.logistic_loss(tx_val, y_val, w_all) ; loss_vall_all_reg = impl.logistic_loss(tx_val, y_val, w_all_reg)
+            train_losses_all.append(loss_tr_all) ; train_losses_all_reg.append(loss_tr_all_reg)
+            val_losses_all.append(loss_vall_all); val_losses_all_reg.append(loss_vall_all_reg)
 
-        loss_vall_all = impl.logistic_loss(tx_val, y_val, w_all) ; loss_vall_all_reg = impl.logistic_loss(tx_val, y_val, w_all_reg)
-        train_losses_all.append(loss_tr_all) ; train_losses_all_reg.append(loss_tr_all_reg)
-        val_losses_all.append(loss_vall_all); val_losses_all_reg.append(loss_vall_all_reg)
+            ## Train model on subset of data (2k) and comparing train loss and validation loss with and without regularization
 
-        ## Train model on subset of data (2k) and comparing train loss and validation loss with and without regularization
+            w , loss_tr = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0, w, 1, GAMMA, MINIBATCH)
+            w_reg , loss_tr_reg = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0.2, w_reg, 1, GAMMA, MINIBATCH)
 
-        w , loss_tr = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0, w, 1, GAMMA, MINIBATCH)
-        w_reg , loss_tr_reg = impl.reg_logistic_regression_stochastic(y_train_subset, tx_train_subset, 0.2, w_reg, 1, GAMMA, MINIBATCH)
+            loss_val = impl.logistic_loss(tx_val, y_val, w) ; loss_val_reg = impl.logistic_loss(tx_val, y_val, w_reg)
+            train_losses.append(loss_tr) ; train_losses_reg.append(loss_tr_reg)
+            val_losses.append(loss_val) ; val_losses_reg.append(loss_val_reg)
 
-        loss_val = impl.logistic_loss(tx_val, y_val, w) ; loss_val_reg = impl.logistic_loss(tx_val, y_val, w_reg)
-        train_losses.append(loss_tr) ; train_losses_reg.append(loss_tr_reg)
-        val_losses.append(loss_val) ; val_losses_reg.append(loss_val_reg)
+            if i % 1000 == 0:
+                print(f"Iteration {i}")
 
-        if i % 1000 == 0:
-            print(f"Iteration {i}")
+        fig, axes = plt.subplots(1, 2, figsize=(15, 5)) ; fig2 , axes2 = plt.subplots(1, 2, figsize=(15, 5))
 
-    fig, axes = plt.subplots(1, 2, figsize=(15, 5)) ; fig2 , axes2 = plt.subplots(1, 2, figsize=(15, 5))
+        axes[0].plot(train_losses, label='Train')
+        axes[0].plot(val_losses, label='Validation')
+        axes[0].set_title(f'Subset of data without regularization : $\\lambda$ = {0}')
+        axes[0].set_xlabel('Iteration')
+        axes[0].set_ylabel('Log-loss')
+        axes[0].legend()
+        axes[0].grid(alpha=0.3)
 
-    axes[0].plot(train_losses, label='Train')
-    axes[0].plot(val_losses, label='Validation')
-    axes[0].set_title(f'Subset of data without regularization : $\\lambda$ = {0}')
-    axes[0].set_xlabel('Iteration')
-    axes[0].set_ylabel('Log-loss')
-    axes[0].legend()
-    axes[0].grid(alpha=0.3)
+        axes[1].plot(train_losses_reg, label='Train')
+        axes[1].plot(val_losses_reg, label='Validation')
+        axes[1].set_title(f'Subset of data with regularization : $\\lambda$ = {0.2}')
+        axes[1].set_xlabel('Iteration')
+        axes[1].set_ylabel('Log-loss')
+        axes[1].legend()
+        axes[1].grid(alpha=0.3)
 
-    axes[1].plot(train_losses_reg, label='Train')
-    axes[1].plot(val_losses_reg, label='Validation')
-    axes[1].set_title(f'Subset of data with regularization : $\\lambda$ = {0.2}')
-    axes[1].set_xlabel('Iteration')
-    axes[1].set_ylabel('Log-loss')
-    axes[1].legend()
-    axes[1].grid(alpha=0.3)
+        axes2[0].plot(train_losses_all, label='Train')
+        axes2[0].plot(val_losses_all, label='Validation')
+        axes2[0].set_title(f'10k data points without regularization : $\\lambda$ = {0}')
+        axes2[0].set_xlabel('Iteration')
+        axes2[0].set_ylabel('Log-loss')
+        axes2[0].legend()
+        axes2[0].grid(alpha=0.3)
 
-    axes2[0].plot(train_losses_all, label='Train')
-    axes2[0].plot(val_losses_all, label='Validation')
-    axes2[0].set_title(f'10k datas without regularization : $\\lambda$ = {0}')
-    axes2[0].set_xlabel('Iteration')
-    axes2[0].set_ylabel('Log-loss')
-    axes2[0].legend()
-    axes2[0].grid(alpha=0.3)
+        axes2[1].plot(train_losses_all_reg, label='Train')
+        axes2[1].plot(val_losses_all_reg, label='Validation')
+        axes2[1].set_title(f'10k data points with regularization : $\\lambda$ = {0.2}')
+        axes2[1].set_xlabel('Iteration')
+        axes2[1].set_ylabel('Log-loss')
+        axes2[1].legend()
+        axes2[1].grid(alpha=0.3)
 
-    axes2[1].plot(train_losses_all_reg, label='Train')
-    axes2[1].plot(val_losses_all_reg, label='Validation')
-    axes2[1].set_title(f'10k datas with regularization : $\\lambda$ = {0.2}')
-    axes2[1].set_xlabel('Iteration')
-    axes2[1].set_ylabel('Log-loss')
-    axes2[1].legend()
-    axes2[1].grid(alpha=0.3)
-
-    plt.tight_layout()
-    plt.show()
+        fig.tight_layout()
+        fig2.tight_layout()
+        fig.savefig('loss_subset.pdf')
+        fig2.savefig('loss_10k.pdf')
+        plt.show()
 
 
 if __name__ == "__main__":
-    main()
+    main(plot_non_null_vs_median=True)
